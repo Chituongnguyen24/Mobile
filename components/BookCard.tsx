@@ -25,9 +25,10 @@ const BookCard = () => {
 
 const styles = StyleSheet.create({
   container: {
-    width: '92%',
+    width: '48%',
     minHeight: 180,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
     padding: 10,
