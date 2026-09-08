@@ -5,7 +5,7 @@ const BookCard = () => {
   return (
     <View style={styles.container}>
       <View style={styles.imageContainer}>
-        <FontAwesome name="file-image-o" size={32} color="#555" />
+        <FontAwesome name="file-image-o" size={28} color="#555" />
         <Text style={styles.imageLabel}>Ảnh bìa</Text>
       </View>
       <View style={styles.infoContainer}>
