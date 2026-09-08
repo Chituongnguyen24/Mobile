@@ -11,7 +11,14 @@ export default function App() {
         style={styles.scrollView}
         contentContainerStyle={styles.bookGrid}
       >
-  
+        <BookCard />
+        <BookCard />
+        <BookCard />
+        <BookCard />
+        <BookCard />
+        <BookCard />
+        <BookCard />
+        <BookCard />
       </ScrollView>
     </View>
   );
