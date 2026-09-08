@@ -1,26 +1,17 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import BookCard from './components/BookCard';
+import CategoryChips from './components/CategoryChips';
 import Header from './components/Header';
 export default function App() {
   return (
     <View style={styles.container}>
       <Header />
+      <CategoryChips />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.bookGrid}
       >
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
-        <BookCard />
+  
       </ScrollView>
     </View>
   );
