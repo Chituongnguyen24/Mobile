@@ -1,16 +1,18 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import BookCard from './components/BookCard';
 import CategoryChips from './components/CategoryChips';
+import FloatingCardButton from './components/FloatingCardButton';
 import Header from './components/Header';
 export default function App() {
   return (
     <View style={styles.container}>
       <Header />
-      <CategoryChips />
+      
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.bookGrid}
       >
+        <CategoryChips />
         <BookCard />
         <BookCard />
         <BookCard />
@@ -20,6 +22,7 @@ export default function App() {
         <BookCard />
         <BookCard />
       </ScrollView>
+      <FloatingCardButton />
     </View>
   );
 }
