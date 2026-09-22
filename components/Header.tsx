@@ -8,10 +8,10 @@ const Header = () => {
             <img src={require('../assets/logo.png')} alt="Logo" style={{ width: '100%', height: '100%' }} />
            </View>
            <View style={styles.leftheader}>
-            <Pressable onPress={() => console.log('Menu pressed')}>
+            <Pressable onPress={() => console.log('Search pressed')}>
                 <Feather name="search" size={24} color="black" />
             </Pressable>
-            <Pressable onPress={() => console.log('Menu pressed')}>
+            <Pressable onPress={() => console.log('Cart pressed')}>
                 <FontAwesome5 name="shopping-cart" size={24} color="black" />
             </Pressable>
            </View>
