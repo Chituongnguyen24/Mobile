@@ -1,159 +1,104 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert,
+} from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons as I } from '@expo/vector-icons';
 import ProductCard, { Product } from './components/ProductCard';
 
-const API = 'https://6abc8ed75121d616d90ba8cf.mockapi.io/products';
-type Form = Omit<Product, 'id'>;
-const EMPTY: Form = { title: '', category: '', price: 0, rating: 0, image: '', inStock: 0, brand: '', size: 0 };
-const NUM_FIELDS = ['price', 'rating', 'inStock', 'size'];
+const API = 'https://YOUR_ID.mockapi.io/products';
+const row = { flexDirection: 'row', alignItems: 'center' } as const;
 
-export default function App() {
+type CartItem = Product & { qty: number };
+
+function Main() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [layout] = useState<'row' | 'tile'>('row');
-  const [search, setSearch] = useState('');
-  const [selCat, setSelCat] = useState<string | null>(null);
-  const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [saving, setSaving] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetch(API).then((r) => r.json()).then(setProducts).finally(() => setLoading(false));
+  }, []);
 
-  const cats = useMemo(() => [...new Set(products.map(p => p.category))].sort(), [products]);
+  const add = useCallback((p: Product) =>
+    setCart((c) =>
+      c.some((i) => i.id === p.id)
+        ? c.map((i) => (i.id === p.id ? { ...i, qty: i.qty + 1 } : i))
+        : [...c, { ...p, qty: 1 }]
+    ), []);
 
-  const filtered = useMemo(() => {
-    let r = products;
-    if (search.trim()) { const k = search.toLowerCase(); r = r.filter(p => p.title.toLowerCase().includes(k) || p.category.toLowerCase().includes(k) || p.brand.toLowerCase().includes(k)); }
-    if (selCat) r = r.filter(p => p.category === selCat);
-    return r;
-  }, [products, search, selCat]);
+  const change = (id: string, d: number) =>
+    setCart((c) => c.map((i) => (i.id === id ? { ...i, qty: i.qty + d } : i)).filter((i) => i.qty > 0));
 
-  const load = async () => {
-    try { setLoading(true); setError(null); const r = await fetch(API); setProducts(await r.json()); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Lỗi tải dữ liệu'); }
-    finally { setLoading(false); }
+  const count = cart.reduce((s, i) => s + i.qty, 0);
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const checkout = () => {
+    Alert.alert('Thanh toán thành công', `Bạn đã thanh toán $${total}`);
+    setCart([]);
+    setShowCart(false);
   };
 
-  const openModal = (p?: Product) => {
-    setEditing(p ?? null);
-    setForm(p ? { title: p.title, category: p.category, price: p.price, rating: p.rating, image: p.image, inStock: p.inStock, brand: p.brand, size: p.size } : EMPTY);
-    setModal(true);
-  };
-
-  const closeModal = () => { setModal(false); setEditing(null); setForm(EMPTY); };
-
-  const submit = async () => {
-    if (!form.title.trim()) { Alert.alert('Lỗi', 'Nhập tên sản phẩm'); return; }
-    try {
-      setSaving(true);
-      const url = editing ? `${API}/${editing.id}` : API;
-      const res = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      const data: Product = await res.json();
-      setProducts(prev => editing ? prev.map(p => p.id === data.id ? data : p) : [...prev, data]);
-      closeModal();
-    } catch { Alert.alert('Lỗi', 'Không thể lưu'); }
-    finally { setSaving(false); }
-  };
-
-  const del = (id: string) => {
-    const p = products.find(x => x.id === id);
-    Alert.alert('Xác nhận', `Xoá "${p?.title}"?`, [
-      { text: 'Huỷ', style: 'cancel' },
-      { text: 'Xoá', style: 'destructive', onPress: async () => {
-        try { await fetch(`${API}/${id}`, { method: 'DELETE' }); setProducts(prev => prev.filter(x => x.id !== id)); }
-        catch { Alert.alert('Lỗi', 'Không thể xoá'); }
-      }},
-    ]);
-  };
-
-  const setField = (k: keyof Form, v: string) => setForm(f => ({ ...f, [k]: NUM_FIELDS.includes(k) ? Number(v) || 0 : v }));
-
-  const field = (label: string, key: keyof Form, num?: boolean) => (
-    <View>
-      <Text style={S.label}>{label}</Text>
-      <TextInput style={S.input} value={String(form[key])} onChangeText={v => setField(key, v)} keyboardType={num ? 'numeric' : 'default'} />
-    </View>
-  );
-
-  if (loading) return <SafeAreaView style={S.center}><ActivityIndicator size="large" color="#333" /><Text style={S.loadTxt}>Đang tải...</Text></SafeAreaView>;
-  if (error) return <SafeAreaView style={S.center}><MaterialIcons name="error" size={48} color="#FF3B30" /><Text style={S.errTxt}>{error}</Text><Text style={S.retry} onPress={load}>Thử lại</Text></SafeAreaView>;
+  if (loading) return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="large" /></View>;
 
   return (
-    <SafeAreaView style={S.cont}>
-      <StatusBar style="dark" />
-      <View style={S.hdr}><MaterialIcons name="movie" size={24} color="#333" /><Text style={S.hdrTxt}>MovieApp</Text></View>
-      <View style={S.search}>
-        <MaterialIcons name="search" size={20} color="#999" style={{ marginRight: 8 }} />
-        <TextInput style={S.searchIn} placeholder="Tìm kiếm..." placeholderTextColor="#999" value={search} onChangeText={setSearch} />
-        {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><MaterialIcons name="cancel" size={20} color="#999" /></TouchableOpacity>}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f2' }}>
+      <View style={{ ...row, justifyContent: 'space-between', padding: 12, backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold' }}>{showCart ? 'Giỏ hàng' : 'Product Store'}</Text>
+        <TouchableOpacity onPress={() => setShowCart(!showCart)}>
+          <I name={showCart ? 'close' : 'shopping-cart'} size={28} />
+          {!showCart && count > 0 && (
+            <Text style={{ position: 'absolute', top: -6, right: -8, minWidth: 18, textAlign: 'center', fontSize: 11, color: '#fff', backgroundColor: 'red', borderRadius: 9, overflow: 'hidden' }}>
+              {count}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
-      <View style={S.filterWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.filterScr}>
-          <TouchableOpacity style={[S.chip, !selCat && S.chipOn]} onPress={() => setSelCat(null)}>
-            <Text style={[S.chipTxt, !selCat && S.chipTxtOn]}>Tất cả</Text>
-          </TouchableOpacity>
-          {cats.map(c => (
-            <TouchableOpacity key={c} style={[S.chip, selCat === c && S.chipOn]} onPress={() => setSelCat(selCat === c ? null : c)}>
-              <Text style={[S.chipTxt, selCat === c && S.chipTxtOn]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      <FlatList data={filtered} keyExtractor={i => i.id}
-        renderItem={({ item }) => <ProductCard product={item} layout={layout} onSelect={id => { const p = products.find(x => x.id === id); if (p) Alert.alert('Chi tiết', `${p.title}\nGiá: $${p.price}\nBrand: ${p.brand}`); }} onEdit={openModal} onDelete={del} />}
-        contentContainerStyle={S.list}
-        ListEmptyComponent={<View style={S.empty}><MaterialIcons name="inventory-2" size={48} color="#999" /><Text style={S.emptyTxt}>Không tìm thấy sản phẩm</Text></View>}
-      />
-      <TouchableOpacity style={S.fab} onPress={() => openModal()}><MaterialIcons name="add" size={28} color="#fff" /></TouchableOpacity>
-      <Modal visible={modal} animationType="slide" transparent>
-        <KeyboardAvoidingView style={S.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={S.modal}>
-            <View style={S.modalHdr}><Text style={S.modalTitle}>{editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</Text><TouchableOpacity onPress={closeModal}><MaterialIcons name="close" size={24} color="#333" /></TouchableOpacity></View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {field('Tên *', 'title')}{field('Danh mục', 'category')}{field('Thương hiệu', 'brand')}
-              {field('Giá', 'price', true)}{field('Đánh giá', 'rating', true)}{field('Tồn kho', 'inStock', true)}{field('Size', 'size', true)}
-              {field('Link ảnh', 'image')}
-            </ScrollView>
-            <TouchableOpacity style={[S.submitBtn, saving && { opacity: 0.6 }]} onPress={submit} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={S.submitTxt}>{editing ? 'Cập nhật' : 'Tạo mới'}</Text>}
+
+      {showCart ? (
+        <>
+          <FlatList
+            data={cart}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={{ padding: 10 }}
+            ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 40 }}>Giỏ hàng trống</Text>}
+            renderItem={({ item }) => (
+              <View style={{ ...row, backgroundColor: '#fff', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                <Image source={{ uri: item.image }} style={{ width: 50, height: 50 }} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={{ fontWeight: 'bold' }}>{item.title}</Text>
+                  <Text style={{ color: 'red' }}>${item.price * item.qty}</Text>
+                </View>
+                <TouchableOpacity onPress={() => change(item.id, -1)}><I name="remove-circle-outline" size={26} /></TouchableOpacity>
+                <Text style={{ marginHorizontal: 8 }}>{item.qty}</Text>
+                <TouchableOpacity onPress={() => change(item.id, 1)}><I name="add-circle-outline" size={26} /></TouchableOpacity>
+              </View>
+            )}
+          />
+          <View style={{ ...row, justifyContent: 'space-between', padding: 12, backgroundColor: '#fff' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Tổng: ${total}</Text>
+            <TouchableOpacity
+              disabled={!cart.length}
+              onPress={checkout}
+              style={{ backgroundColor: cart.length ? '#007AFF' : '#ccc', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Thanh toán</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </>
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={(i) => i.id}
+          contentContainerStyle={{ padding: 10 }}
+          renderItem={({ item }) => <ProductCard product={item} onAdd={add} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-const S = StyleSheet.create({
-  cont: { flex: 1, backgroundColor: '#f0f0f0' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' },
-  hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, backgroundColor: '#fff' },
-  hdrTxt: { fontSize: 24, fontWeight: 'bold' },
-  search: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginTop: 12, borderRadius: 10, paddingHorizontal: 12, height: 44 },
-  searchIn: { flex: 1, fontSize: 15, color: '#333' },
-  filterWrap: { marginTop: 10, marginBottom: 4 },
-  filterScr: { paddingHorizontal: 12, gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff' },
-  chipOn: { backgroundColor: '#333' },
-  chipTxt: { fontSize: 13, color: '#666' },
-  chipTxtOn: { color: '#fff', fontWeight: 'bold' },
-  list: { padding: 12, paddingBottom: 80 },
-  loadTxt: { marginTop: 12, fontSize: 16, color: '#666' },
-  errTxt: { fontSize: 16, color: '#FF3B30', marginVertical: 12 },
-  retry: { fontSize: 16, color: '#007AFF', textDecorationLine: 'underline' },
-  empty: { alignItems: 'center', marginTop: 40 },
-  emptyTxt: { marginTop: 8, fontSize: 16, color: '#999' },
-  fab: { position: 'absolute', bottom: 24, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 30, maxHeight: '85%' },
-  modalHdr: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  label: { fontSize: 13, color: '#666', marginBottom: 4, marginTop: 10 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#333', backgroundColor: '#fafafa' },
-  submitBtn: { backgroundColor: '#333', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  submitTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-});
+export default function App() {
+  return <SafeAreaProvider><Main /></SafeAreaProvider>;
+}
